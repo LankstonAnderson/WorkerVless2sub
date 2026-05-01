@@ -118,6 +118,7 @@
  - 修改 `addressescsv` 参数，在脚本中设置 `addressescsv` 变量为 **测速结果文本表格文件地址** 的 URL，支持：
 	- iptest 格式：`IP地址,端口,回源端口,TLS,数据中心,...,速度(MB/s)`
 	- CloudflareSpeedTest/result.csv 格式：`IP 地址,已发送,已接收,丢包率,平均延迟,下载速度(MB/s),地区码`
+	- 地区列可识别 `地区码`、`地区代码`、`国家码`、`国家代码`、`colo`、`iata`、`region code`、`country code` 等表头；存在地区列时会跳过 `N/A`、空值、`UNKNOWN` 等无效地区IP
 	- CSV、TSV、分号分隔等文本表格；若没有 `TLS` 列，TLS 订阅默认使用 `443` 端口，noTLS 订阅默认使用 `80` 端口。例如：
 	```js
 	let DLS = 4;//速度下限
@@ -211,7 +212,7 @@
 | ADDAPI | [https://raw.github.../addressesapi.txt](https://raw.githubusercontent.com/cmliu/WorkerVless2sub/main/addressesapi.txt) | 对应`addressesapi`字段 （支持多元素, 元素之间使用`,`或`换行`作间隔） | 
 | ADDNOTLS | `icook.hk:8080#官方优选域名` | 对应`addressesnotls`字段 （支持多元素, 元素之间使用`,`或`换行`作间隔） | 
 | ADDNOTLSAPI | [https://raw.github.../addressesapi.txt](https://raw.githubusercontent.com/cmliu/CFcdnVmess2sub/main/addressesapi.txt) | 对应`addressesnotlsapi`字段 （支持多元素, 元素之间使用`,`或`换行`作间隔） | 
-| ADDCSV | [https://raw.github.../addressescsv.csv](https://raw.githubusercontent.com/cmliu/WorkerVless2sub/main/addressescsv.csv) | 对应`addressescsv`字段，支持 iptest CSV、CloudflareSpeedTest/result.csv、TSV/分号分隔文本表格（支持多元素, 元素之间使用`,`或`换行`作间隔） |
+| ADDCSV | [https://raw.github.../addressescsv.csv](https://raw.githubusercontent.com/cmliu/WorkerVless2sub/main/addressescsv.csv) | 对应`addressescsv`字段，支持 iptest CSV、CloudflareSpeedTest/result.csv、TSV/分号分隔文本表格，识别更多地区/国家代码表头并跳过 `N/A` 地区IP（支持多元素, 元素之间使用`,`或`换行`作间隔） |
 | DLS | `8` |`addressescsv`测速结果满足速度下限 | 
 | NOTLS | `false` | 改为`true`, 将不做域名判断 始终返回noTLS节点 | 
 | TGTOKEN | `6894123456:XXXXXXXXXX0qExVsBPUhHDAbXXXXXqWXgBA` | 发送TG通知的机器人token | 
@@ -227,7 +228,7 @@
 | PS | `【请勿测速】` | 节点名备注消息 | 
 | PROXYIP | `proxyip.cmliussss.net` | 默认分配的ProxyIP, 多ProxyIP将随机分配（支持多元素, 元素之间使用`,`或`换行`作间隔） | 
 | PROXYIPAPI | `https://raw.cmliussss.com/Serv00_ProxyIP.txt` | 不支持多元素 | 
-| CMPROXYIPS | `proxyip.aliyun.cmliussss.net#HK` | 识别HK后分配对应的ProxyIP（支持多元素, 元素之间使用`,`或`换行`作间隔） | 
+| CMPROXYIPS | `proxyip.aliyun.cmliussss.net#HK` | 识别HK后分配对应的ProxyIP；SJC/LAX/NRT/FRA等机房码会优先映射到US/JP/DE等国家码后匹配（支持多元素, 元素之间使用`,`或`换行`作间隔） |
 | CFPORTS | `2053`,`2096`,`8443` | CF账户标准端口列表 |
 | URL302 | `https://t.me/CMLiussss` | 主页302跳转(支持多url, url之间使用`,`或`换行`作间隔, 小白别用) |
 | URL | `https://blog.cmliussss.com` | 主页反代伪装(支持多url, url之间使用`,`或`换行`作间隔, 乱设容易触发反诈) |

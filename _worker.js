@@ -46,6 +46,70 @@ let 网络备案 = `<a href='https://t.me/CMLiussss'>萌ICP备-20240707号</a>`;
 let 额外ID = '0';
 let 加密方式 = 'auto';
 let 网站图标, 网站头像, 网站背景, xhttp = '';
+const 无效地区代码 = new Set(['', 'N/A', 'N\\A', 'NONE', 'NULL', 'UNKNOWN', 'UNKNOW', '-', '--']);
+const 地区代码映射 = {
+	AMS: 'NL', ARN: 'SE', ATH: 'GR', ATL: 'US', AKL: 'NZ', BAH: 'BH', BCN: 'ES', BKK: 'TH',
+	BLR: 'IN', BNE: 'AU', BOG: 'CO', BOM: 'IN', BOS: 'US', BRU: 'BE', BUD: 'HU', CAI: 'EG',
+	CDG: 'FR', CGK: 'ID', CPH: 'DK', CPT: 'ZA', DEL: 'IN', DEN: 'US', DFW: 'US', DOH: 'QA',
+	DTW: 'US', DUB: 'IE', DUS: 'DE', DXB: 'AE', EDI: 'GB', EWR: 'US', EZE: 'AR', FCO: 'IT',
+	FRA: 'DE', GIG: 'BR', GRU: 'BR', HAM: 'DE', HAN: 'VN', HEL: 'FI', HKG: 'HK', HYD: 'IN',
+	IAD: 'US', ICN: 'KR', IST: 'TR', JED: 'SA', JNB: 'ZA', KIX: 'JP', KUL: 'MY', KWI: 'KW',
+	LAS: 'US', LAX: 'US', LIM: 'PE', LIS: 'PT', LHR: 'GB', MAD: 'ES', MAN: 'GB', MAA: 'IN',
+	MCI: 'US', MEL: 'AU', MEX: 'MX', MIA: 'US', MLE: 'MV', MNL: 'PH', MSP: 'US', MXP: 'IT',
+	MUC: 'DE', NBO: 'KE', NRT: 'JP', ORD: 'US', OSL: 'NO', PER: 'AU', PDX: 'US', PHX: 'US',
+	PRG: 'CZ', RUH: 'SA', SEA: 'US', SFO: 'US', SJC: 'US', SCL: 'CL', SIN: 'SG', SGN: 'VN',
+	SYD: 'AU', TPE: 'TW', TPA: 'US', TLV: 'IL', VIE: 'AT', WAW: 'PL', YUL: 'CA', YVR: 'CA',
+	YYZ: 'CA', ZRH: 'CH'
+};
+const 地区名称映射 = {
+	UNITEDSTATES: 'US', USA: 'US', AMERICA: 'US', CANADA: 'CA', JAPAN: 'JP', GERMANY: 'DE',
+	FRANCE: 'FR', NETHERLANDS: 'NL', UNITEDKINGDOM: 'GB', UK: 'GB', BRITAIN: 'GB',
+	HONGKONG: 'HK', SINGAPORE: 'SG', KOREA: 'KR', SOUTHKOREA: 'KR', TAIWAN: 'TW',
+	AUSTRALIA: 'AU', INDIA: 'IN', BRAZIL: 'BR', CHINA: 'CN', SOUTHAFRICA: 'ZA'
+};
+
+function 规范地区代码(value) {
+	return String(value || '').trim().replace(/^#+/, '').toUpperCase();
+}
+
+function 是无效地区代码(value) {
+	const code = 规范地区代码(value);
+	const compactCode = code.replace(/[\s_\-]+/g, '');
+	return 无效地区代码.has(code) || 无效地区代码.has(compactCode);
+}
+
+function 获取地区匹配代码(value) {
+	const rawCode = 规范地区代码(value);
+	if (是无效地区代码(rawCode)) return [];
+
+	const tokens = rawCode.split(/[^A-Z0-9]+/).filter(Boolean);
+	const codes = [];
+	const compactRawCode = rawCode.replace(/[^A-Z0-9]/g, '');
+	if (地区名称映射[compactRawCode]) codes.push(地区名称映射[compactRawCode]);
+
+	for (const token of tokens.length > 0 ? tokens : [rawCode]) {
+		if (是无效地区代码(token)) continue;
+		codes.push(token);
+		if (地区代码映射[token]) codes.push(地区代码映射[token]);
+
+		const compactToken = token.replace(/[^A-Z0-9]/g, '');
+		if (地区名称映射[compactToken]) codes.push(地区名称映射[compactToken]);
+	}
+
+	return [...new Set(codes)];
+}
+
+function 地区标记匹配(addressId, regionTag) {
+	const addressText = String(addressId || '').toLowerCase();
+	const tagText = String(regionTag || '').trim().toLowerCase();
+	if (!tagText) return false;
+	if (addressText.includes(tagText)) return true;
+
+	const addressCodes = 获取地区匹配代码(addressId).map(code => code.toLowerCase());
+	const tagCodes = 获取地区匹配代码(regionTag).map(code => code.toLowerCase());
+	return tagCodes.some(code => addressCodes.includes(code));
+}
+
 async function 整理优选列表(api) {
 	if (!api || api.length === 0) return [];
 
@@ -203,6 +267,14 @@ async function 整理测速结果(tls) {
 		return normalizedHeader.findIndex(columnName => aliases.some(alias => columnName === alias || columnName.includes(alias)));
 	}
 
+	function findRemarkColumn(normalizedHeader) {
+		return findColumn(normalizedHeader, [
+			'数据中心', '地区码', '地区代码', '地区', '国家码', '国家代码', '国家', '城市',
+			'colo', 'colocode', 'iata', 'airport', 'datacenter', 'dc', 'location',
+			'regioncode', 'region', 'countrycode', 'country', 'city'
+		]);
+	}
+
 	function parseNumber(value) {
 		const match = String(value || '').replace(/,/g, '').match(/-?\d+(\.\d+)?/);
 		return match ? parseFloat(match[0]) : NaN;
@@ -232,12 +304,16 @@ async function 整理测速结果(tls) {
 		return tlsValue.toUpperCase() === targetTls.toUpperCase();
 	}
 
-	function getRemark(row, header, tlsIndex) {
-		if (tlsIndex !== -1 && row[tlsIndex + remarkIndex]) return row[tlsIndex + remarkIndex].trim();
+	function getRemark(row, tlsIndex, remarkColumnIndex) {
+		if (tlsIndex !== -1 && row[tlsIndex + remarkIndex] && !是无效地区代码(row[tlsIndex + remarkIndex])) {
+			return row[tlsIndex + remarkIndex].trim();
+		}
 
-		const normalizedHeader = header.map(normalizeHeaderName);
-		const remarkColumnIndex = findColumn(normalizedHeader, ['数据中心', '地区码', '地区', '城市', 'colo', 'datacenter', 'dc', 'location', 'region', 'city']);
-		return remarkColumnIndex !== -1 ? row[remarkColumnIndex].trim() : '';
+		if (remarkColumnIndex !== -1 && row[remarkColumnIndex] && !是无效地区代码(row[remarkColumnIndex])) {
+			return row[remarkColumnIndex].trim();
+		}
+
+		return '';
 	}
 
 	function isLikelyAddress(value) {
@@ -267,6 +343,7 @@ async function 整理测速结果(tls) {
 			const portIndex = findColumn(normalizedHeader, ['端口', 'port']);
 			const tlsIndex = findColumn(normalizedHeader, ['tls', 'istls', '是否tls']);
 			const speedIndex = findColumn(normalizedHeader, ['下载速度', '速度', 'speed', 'downloadspeed', 'download']);
+			const remarkColumnIndex = findRemarkColumn(normalizedHeader);
 
 			if (ipIndex === -1) {
 				ipIndex = 0;
@@ -277,12 +354,13 @@ async function 整理测速结果(tls) {
 					if (!isLikelyAddress(row[ipIndex])) return false;
 					const speed = getSpeed(row, speedIndex);
 					const tlsOK = tlsIndex === -1 || tlsMatches(row[tlsIndex], tls);
-					return tlsOK && speed > DLS;
+					const regionOK = remarkColumnIndex === -1 || !是无效地区代码(row[remarkColumnIndex]);
+					return regionOK && tlsOK && speed > DLS;
 				})
 				.map(row => {
 					const ipAddress = row[ipIndex].trim();
 					const port = portIndex !== -1 && row[portIndex] ? row[portIndex].trim() : (tls.toUpperCase() === 'TRUE' ? '443' : '80');
-					const dataCenter = getRemark(row, header, tlsIndex);
+					const dataCenter = getRemark(row, tlsIndex, remarkColumnIndex);
 					const formattedAddress = dataCenter ? `${ipAddress}:${port}#${dataCenter}` : `${ipAddress}:${port}`;
 
 					// 处理代理IP池
@@ -403,11 +481,12 @@ function surge(content, url, path) {
 }
 
 function getRandomProxyByMatch(CC, socks5Data) {
-	// 将匹配字符串转换为小写
-	const lowerCaseMatch = CC.toLowerCase();
+	const matchCodes = 获取地区匹配代码(CC).map(code => code.toLowerCase());
 
-	// 过滤出所有以指定匹配字符串结尾的代理字符串
-	let filteredProxies = socks5Data.filter(proxy => proxy.toLowerCase().endsWith(`#${lowerCaseMatch}`));
+	// 过滤出所有以指定地区码结尾的代理字符串，支持SJC/LAX/NRT等机房码映射到US/JP等国家码
+	let filteredProxies = matchCodes.length > 0
+		? socks5Data.filter(proxy => matchCodes.some(code => proxy.toLowerCase().endsWith(`#${code}`)))
+		: [];
 
 	// 如果没有匹配的代理，尝试匹配 "US"
 	if (filteredProxies.length === 0) {
@@ -1359,10 +1438,10 @@ export default {
 						} else {
 							// 遍历匹配PROXYIP数组查找匹配项
 							for (let item of 匹配PROXYIP) {
-								if (item.includes('#') && item.split('#')[1] && lowerAddressid.includes(item.split('#')[1].toLowerCase())) {
+								if (item.includes('#') && item.split('#')[1] && 地区标记匹配(lowerAddressid, item.split('#')[1])) {
 									foundProxyIP = item.split('#')[0];
 									break; // 找到匹配项，跳出循环
-								} else if (item.includes(':') && item.split(':')[1] && lowerAddressid.includes(item.split(':')[1].toLowerCase())) {
+								} else if (item.includes(':') && item.split(':')[1] && 地区标记匹配(lowerAddressid, item.split(':')[1])) {
 									foundProxyIP = item.split(':')[0];
 									break; // 找到匹配项，跳出循环
 								}
@@ -1445,10 +1524,10 @@ export default {
 					} else {
 						// 遍历匹配PROXYIP数组查找匹配项
 						for (let item of 匹配PROXYIP) {
-							if (item.includes('#') && item.split('#')[1] && lowerAddressid.includes(item.split('#')[1].toLowerCase())) {
+							if (item.includes('#') && item.split('#')[1] && 地区标记匹配(lowerAddressid, item.split('#')[1])) {
 								foundProxyIP = item.split('#')[0];
 								break; // 找到匹配项，跳出循环
-							} else if (item.includes(':') && item.split(':')[1] && lowerAddressid.includes(item.split(':')[1].toLowerCase())) {
+							} else if (item.includes(':') && item.split(':')[1] && 地区标记匹配(lowerAddressid, item.split(':')[1])) {
 								foundProxyIP = item.split(':')[0];
 								break; // 找到匹配项，跳出循环
 							}

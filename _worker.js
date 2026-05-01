@@ -349,19 +349,39 @@ async function 整理测速结果(tls) {
 				ipIndex = 0;
 			}
 
-			return dataRows
-				.filter(row => {
+			const candidateRows = dataRows
+				.map(row => ({
+					row,
+					speed: getSpeed(row, speedIndex),
+					regionCode: remarkColumnIndex === -1 ? '' : 规范地区代码(row[remarkColumnIndex])
+				}))
+				.filter(({ row, speed, regionCode }) => {
 					if (!isLikelyAddress(row[ipIndex])) return false;
-					const speed = getSpeed(row, speedIndex);
+					if (Number.isNaN(speed)) return false;
 					const tlsOK = tlsIndex === -1 || tlsMatches(row[tlsIndex], tls);
-					const regionOK = remarkColumnIndex === -1 || !是无效地区代码(row[remarkColumnIndex]);
-					return regionOK && tlsOK && speed > DLS;
-				})
-				.map(row => {
+					const regionOK = remarkColumnIndex === -1 || !是无效地区代码(regionCode);
+					return regionOK && tlsOK;
+				});
+			const selectedRows = candidateRows.filter(candidate => candidate.speed > DLS);
+
+			if (remarkColumnIndex !== -1) {
+				const bestByRegion = new Map();
+				for (const candidate of candidateRows) {
+					const previous = bestByRegion.get(candidate.regionCode);
+					if (!previous || candidate.speed > previous.speed) bestByRegion.set(candidate.regionCode, candidate);
+				}
+				selectedRows.push(...bestByRegion.values());
+			}
+
+			const seenAddresses = new Set();
+			return selectedRows
+				.map(({ row }) => {
 					const ipAddress = row[ipIndex].trim();
 					const port = portIndex !== -1 && row[portIndex] ? row[portIndex].trim() : (tls.toUpperCase() === 'TRUE' ? '443' : '80');
 					const dataCenter = getRemark(row, tlsIndex, remarkColumnIndex);
 					const formattedAddress = dataCenter ? `${ipAddress}:${port}#${dataCenter}` : `${ipAddress}:${port}`;
+					if (seenAddresses.has(formattedAddress)) return null;
+					seenAddresses.add(formattedAddress);
 
 					// 处理代理IP池
 					if (csvUrl.includes('proxyip=true') &&
@@ -371,7 +391,8 @@ async function 整理测速结果(tls) {
 					}
 
 					return formattedAddress;
-				});
+				})
+				.filter(Boolean);
 		} catch (error) {
 			console.error(`处理CSV ${csvUrl} 时出错:`, error);
 			return [];

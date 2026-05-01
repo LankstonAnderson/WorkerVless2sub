@@ -143,14 +143,106 @@ async function 整理测速结果(tls) {
 		return [];
 	}
 
-	// CSV解析函数
-	function parseCSV(text) {
-		return text
-			.replace(/\r\n/g, '\n')   // 统一Windows换行
-			.replace(/\r/g, '\n')	 // 处理老Mac换行
-			.split('\n')			   // 按Unix/Linux风格分割
-			.filter(line => line.trim() !== '')  // 移除空行
-			.map(line => line.split(',').map(cell => cell.trim()));
+	// 文本表格解析函数，兼容CSV/TSV以及带引号的单元格。
+	function parseTable(text) {
+		const normalizedText = text
+			.replace(/^\uFEFF/, '')
+			.replace(/\r\n/g, '\n')
+			.replace(/\r/g, '\n');
+		const lines = normalizedText.split('\n').filter(line => line.trim() !== '');
+		if (lines.length === 0) return [];
+
+		const delimiter = detectDelimiter(lines[0]);
+		return lines.map(line => parseDelimitedLine(line, delimiter));
+	}
+
+	function detectDelimiter(headerLine) {
+		const delimiters = [',', '\t', ';'];
+		return delimiters
+			.map(delimiter => ({ delimiter, count: parseDelimitedLine(headerLine, delimiter).length }))
+			.sort((a, b) => b.count - a.count)[0].delimiter;
+	}
+
+	function parseDelimitedLine(line, delimiter) {
+		const cells = [];
+		let cell = '';
+		let inQuotes = false;
+
+		for (let i = 0; i < line.length; i++) {
+			const char = line[i];
+			const nextChar = line[i + 1];
+
+			if (char === '"') {
+				if (inQuotes && nextChar === '"') {
+					cell += '"';
+					i++;
+				} else {
+					inQuotes = !inQuotes;
+				}
+			} else if (char === delimiter && !inQuotes) {
+				cells.push(cell.trim());
+				cell = '';
+			} else {
+				cell += char;
+			}
+		}
+
+		cells.push(cell.trim());
+		return cells;
+	}
+
+	function normalizeHeaderName(headerName) {
+		return String(headerName || '')
+			.replace(/^\uFEFF/, '')
+			.trim()
+			.toLowerCase()
+			.replace(/[\s_\-()（）/\\:：.。]+/g, '');
+	}
+
+	function findColumn(normalizedHeader, aliases) {
+		return normalizedHeader.findIndex(columnName => aliases.some(alias => columnName === alias || columnName.includes(alias)));
+	}
+
+	function parseNumber(value) {
+		const match = String(value || '').replace(/,/g, '').match(/-?\d+(\.\d+)?/);
+		return match ? parseFloat(match[0]) : NaN;
+	}
+
+	function getSpeed(row, speedIndex) {
+		if (speedIndex !== -1) {
+			const speed = parseNumber(row[speedIndex]);
+			if (!Number.isNaN(speed)) return speed;
+		}
+
+		for (let i = row.length - 1; i >= 0; i--) {
+			const speed = parseNumber(row[i]);
+			if (!Number.isNaN(speed)) return speed;
+		}
+
+		return NaN;
+	}
+
+	function tlsMatches(rowValue, targetTls) {
+		const tlsValue = String(rowValue || '').trim().toLowerCase();
+		const targetValue = targetTls.toUpperCase() === 'TRUE';
+
+		if (['true', 'tls', '1', 'yes', 'y'].includes(tlsValue)) return targetValue;
+		if (['false', 'notls', 'no-tls', '0', 'no', 'n'].includes(tlsValue)) return !targetValue;
+
+		return tlsValue.toUpperCase() === targetTls.toUpperCase();
+	}
+
+	function getRemark(row, header, tlsIndex) {
+		if (tlsIndex !== -1 && row[tlsIndex + remarkIndex]) return row[tlsIndex + remarkIndex].trim();
+
+		const normalizedHeader = header.map(normalizeHeaderName);
+		const remarkColumnIndex = findColumn(normalizedHeader, ['数据中心', '地区码', '地区', '城市', 'colo', 'datacenter', 'dc', 'location', 'region', 'city']);
+		return remarkColumnIndex !== -1 ? row[remarkColumnIndex].trim() : '';
+	}
+
+	function isLikelyAddress(value) {
+		const address = String(value || '').trim();
+		return /^(\d{1,3}\.){3}\d{1,3}$/.test(address) || /^\[?[0-9a-f:]+\]?$/i.test(address);
 	}
 
 	// 并行处理CSV
@@ -163,31 +255,39 @@ async function 整理测速结果(tls) {
 			}
 
 			const text = await response.text();
-			const rows = parseCSV(text);
+			const rows = parseTable(text);
+			if (rows.length === 0) return [];
 
-			// 解构和验证CSV头部
-			const [header, ...dataRows] = rows;
-			const tlsIndex = header.findIndex(col => col.toUpperCase() === 'TLS');
+			// 解构和验证表头。支持iptest CSV，也支持CloudflareSpeedTest/result.csv这类无TLS/端口列的测速结果。
+			const hasHeader = !isLikelyAddress(rows[0][0]);
+			const header = hasHeader ? rows[0] : [];
+			const dataRows = hasHeader ? rows.slice(1) : rows;
+			const normalizedHeader = header.map(normalizeHeaderName);
+			let ipIndex = hasHeader ? findColumn(normalizedHeader, ['ip地址', 'ip', 'address', 'ipaddress']) : 0;
+			const portIndex = findColumn(normalizedHeader, ['端口', 'port']);
+			const tlsIndex = findColumn(normalizedHeader, ['tls', 'istls', '是否tls']);
+			const speedIndex = findColumn(normalizedHeader, ['下载速度', '速度', 'speed', 'downloadspeed', 'download']);
 
-			if (tlsIndex === -1) {
-				throw new Error('CSV文件缺少必需的字段');
+			if (ipIndex === -1) {
+				ipIndex = 0;
 			}
 
 			return dataRows
 				.filter(row => {
-					const tlsValue = row[tlsIndex].toUpperCase();
-					const speed = parseFloat(row[row.length - 1]);
-					return tlsValue === tls.toUpperCase() && speed > DLS;
+					if (!isLikelyAddress(row[ipIndex])) return false;
+					const speed = getSpeed(row, speedIndex);
+					const tlsOK = tlsIndex === -1 || tlsMatches(row[tlsIndex], tls);
+					return tlsOK && speed > DLS;
 				})
 				.map(row => {
-					const ipAddress = row[0];
-					const port = row[1];
-					const dataCenter = row[tlsIndex + remarkIndex];
-					const formattedAddress = `${ipAddress}:${port}#${dataCenter}`;
+					const ipAddress = row[ipIndex].trim();
+					const port = portIndex !== -1 && row[portIndex] ? row[portIndex].trim() : (tls.toUpperCase() === 'TRUE' ? '443' : '80');
+					const dataCenter = getRemark(row, header, tlsIndex);
+					const formattedAddress = dataCenter ? `${ipAddress}:${port}#${dataCenter}` : `${ipAddress}:${port}`;
 
 					// 处理代理IP池
 					if (csvUrl.includes('proxyip=true') &&
-						row[tlsIndex].toUpperCase() === 'TRUE' &&
+						(tlsIndex === -1 ? tls.toUpperCase() === 'TRUE' : tlsMatches(row[tlsIndex], 'TRUE')) &&
 						!httpsPorts.includes(port)) {
 						proxyIPPool.push(`${ipAddress}:${port}`);
 					}

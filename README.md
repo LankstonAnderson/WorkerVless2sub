@@ -50,7 +50,7 @@
    https://raw.githubusercontent.com/cmliu/WorkerVless2sub/main/addressesipv6api.txt
    ```
 
-   - 添加变量 `ADDCSV` 为 **iptest测速结果csv文件地址** 的 URL。例如：
+   - 添加变量 `ADDCSV` 为 **测速结果文本表格文件地址** 的 URL，支持 iptest CSV、CloudflareSpeedTest/result.csv，也支持 TSV/分号分隔文本表格。例如：
    ```js
    https://raw.githubusercontent.com/cmliu/WorkerVless2sub/main/addressescsv.csv
    ```
@@ -115,7 +115,10 @@
  
 **3.3 修改 addressescsv 参数示例**
   
- - 修改 `addressescsv` 参数，在脚本中设置 `addressescsv` 变量为 **iptest测速结果csv文件地址** 的 URL。例如：
+ - 修改 `addressescsv` 参数，在脚本中设置 `addressescsv` 变量为 **测速结果文本表格文件地址** 的 URL，支持：
+	- iptest 格式：`IP地址,端口,回源端口,TLS,数据中心,...,速度(MB/s)`
+	- CloudflareSpeedTest/result.csv 格式：`IP 地址,已发送,已接收,丢包率,平均延迟,下载速度(MB/s),地区码`
+	- CSV、TSV、分号分隔等文本表格；若没有 `TLS` 列，TLS 订阅默认使用 `443` 端口，noTLS 订阅默认使用 `80` 端口。例如：
 	```js
 	let DLS = 4;//速度下限
 	let addressescsv = [
@@ -123,7 +126,7 @@
  		'https://raw.githubusercontent.com/cmliu/WorkerVless2sub/main/addressescsv.csv',
 	];
 	```
-	`DLS` 为要求满足的最低速度，不满足改数值以上的IP将不会添加至优选订阅内容。注意：不考虑单位，只看数值，请按照您的测速结果而定。
+	`DLS` 为要求满足的最低速度，不满足改数值以上的IP将不会添加至优选订阅内容。注意：不考虑单位，只看数值，请按照您的测速结果而定。`ADDCSV` 读取的是 Worker 可直接 `fetch` 的文本内容，不支持二进制 `.xlsx/.xls` 文件。
 
  </details>
 
@@ -208,7 +211,7 @@
 | ADDAPI | [https://raw.github.../addressesapi.txt](https://raw.githubusercontent.com/cmliu/WorkerVless2sub/main/addressesapi.txt) | 对应`addressesapi`字段 （支持多元素, 元素之间使用`,`或`换行`作间隔） | 
 | ADDNOTLS | `icook.hk:8080#官方优选域名` | 对应`addressesnotls`字段 （支持多元素, 元素之间使用`,`或`换行`作间隔） | 
 | ADDNOTLSAPI | [https://raw.github.../addressesapi.txt](https://raw.githubusercontent.com/cmliu/CFcdnVmess2sub/main/addressesapi.txt) | 对应`addressesnotlsapi`字段 （支持多元素, 元素之间使用`,`或`换行`作间隔） | 
-| ADDCSV | [https://raw.github.../addressescsv.csv](https://raw.githubusercontent.com/cmliu/WorkerVless2sub/main/addressescsv.csv) | 对应`addressescsv`字段 （支持多元素, 元素之间使用`,`或`换行`作间隔） | 
+| ADDCSV | [https://raw.github.../addressescsv.csv](https://raw.githubusercontent.com/cmliu/WorkerVless2sub/main/addressescsv.csv) | 对应`addressescsv`字段，支持 iptest CSV、CloudflareSpeedTest/result.csv、TSV/分号分隔文本表格（支持多元素, 元素之间使用`,`或`换行`作间隔） |
 | DLS | `8` |`addressescsv`测速结果满足速度下限 | 
 | NOTLS | `false` | 改为`true`, 将不做域名判断 始终返回noTLS节点 | 
 | TGTOKEN | `6894123456:XXXXXXXXXX0qExVsBPUhHDAbXXXXXqWXgBA` | 发送TG通知的机器人token | 

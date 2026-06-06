@@ -1,0 +1,14 @@
+name = "cfster-reader"
+main = "worker.js"
+compatibility_date = "2025-06-06"
+
+# === R2 Bucket 绑定 ===
+# 部署前需要：
+# 1. 在 Cloudflare Dashboard → R2 创建 bucket（名称：cfst-results）
+# 2. 在 Worker 设置中绑定 R2 bucket：
+#    变量名：CFST_R2
+#    R2 bucket：cfst-results
+#
+# 可选：添加 Token 验证
+# 在 Worker 设置中添加环境变量：
+#   CFST_TOKEN=your_secret_token  # 如果设置了，访问时需要 ?token=xxx 或 X-Auth-Token 头

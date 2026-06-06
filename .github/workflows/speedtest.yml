@@ -6,89 +6,57 @@ permissions:
 on:
   schedule:
     - cron: '0 2 * * *'  # 每天 UTC 02:00（北京时间 10:00）
-  workflow_dispatch:       # 支持手动触发
+  workflow_dispatch:       # 手动触发
 
 env:
   CFST_VERSION: '2.3.5'
-  HISTORY_DAYS: 7          # 保留历史天数
+  HISTORY_DAYS: 7
 
 jobs:
   speedtest:
-    name: Run CFST & Upload
+    name: Run CFST
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download CloudflareSpeedTest
+      - name: Download CFST
         run: |
           wget -q "https://github.com/XIU2/CloudflareSpeedTest/releases/download/v${{ env.CFST_VERSION }}/cfst_linux_amd64.tar.gz"
           tar -zxf cfst_linux_amd64.tar.gz
           chmod +x cfst
-          ./cfst -v
 
       - name: Run SpeedTest
         run: |
-          # 延迟测速，禁用下载测速（GitHub Actions 网络环境不适合下载测速）
           ./cfst -f ip.txt -o result.csv \
-            -tl 200 \
-            -tll 0 \
-            -tlr 0.2 \
-            -dd \
-            -p 0 \
-            -n 500
+            -tl 200 -tll 0 -tlr 0.2 \
+            -dd -p 0 -n 500
 
-          echo "=== 测速结果 ==="
-          TOTAL=$(tail -n +2 result.csv | wc -l)
-          echo "可用 IP 数量: $TOTAL"
-          head -10 result.csv
+          echo "测速完成，共 $(tail -n +2 result.csv | wc -l) 个 IP"
 
-      - name: Process Results
+      - name: Update Files
         run: |
           TODAY=$(date +%Y-%m-%d)
-          ARCHIVE_DIR="archive"
-          mkdir -p "$ARCHIVE_DIR"
+          mkdir -p archive
 
-          # 1. 保存今日结果到 archive
-          cp result.csv "$ARCHIVE_DIR/$TODAY.csv"
-          echo "✅ 已保存 archive/$TODAY.csv"
-
-          # 2. 更新 latest.csv（去表头，便于 WorkerVless2sub 读取）
+          # 1. latest.csv → 直接用今天的结果（无表头）
           tail -n +2 result.csv > latest.csv
-          echo "✅ 已更新 latest.csv"
 
-          # 3. 合并最近 N 天的历史到 history.csv
-          # 获取所有 archive 文件（按日期倒序），取最近 N 天
-          HISTORY_FILE="history.csv"
-          echo "IP地址,已发送,已接收,丢包率,平均延迟,下载速度(MB/s),地区码" > "$HISTORY_FILE"
+          # 2. 保存今日到 archive（仅用于 history 合并）
+          cp result.csv "archive/$TODAY.csv"
 
-          # 收集最近 HISTORY_DAYS 天的文件
-          ls -r "$ARCHIVE_DIR"/*.csv 2>/dev/null | head -${{ env.HISTORY_DAYS }} | while read f; do
-            echo "--- 合并: $f ---"
-            tail -n +2 "$f" >> "$HISTORY_FILE"
-          done
+          # 3. history.csv → 合并最近 7 天，去重
+          echo "IP地址,已发送,已接收,丢包率,平均延迟,下载速度(MB/s),地区码" > history.csv
+          ls -r archive/*.csv | head -$HISTORY_DAYS | while read f; do
+            tail -n +2 "$f"
+          done | awk -F',' '!seen[$1]++' >> history.csv
 
-          # 去重（按 IP 地址去重，保留最新的记录）
-          # 先保留表头，然后按 IP 去重
-          HEAD_LINE=$(head -1 "$HISTORY_FILE")
-          echo "$HEAD_LINE" > "${HISTORY_FILE}.tmp"
-          tail -n +2 "$HISTORY_FILE" | awk -F',' '!seen[$1]++' >> "${HISTORY_FILE}.tmp"
-          mv "${HISTORY_FILE}.tmp" "$HISTORY_FILE"
+          # 4. 清理过期 archive
+          find archive -name "*.csv" -mtime +$HISTORY_DAYS -delete
 
-          HISTORY_TOTAL=$(tail -n +2 "$HISTORY_FILE" | wc -l)
-          echo "✅ history.csv 合并完成，共 $HISTORY_TOTAL 个 IP"
-
-          # 4. 清理超过 HISTORY_DAYS 天的 archive 文件
-          find "$ARCHIVE_DIR" -name "*.csv" -mtime +${{ env.HISTORY_DAYS }} -delete
-          echo "✅ 已清理过期 archive 文件"
-
-          # 5. 统计信息
-          echo ""
-          echo "=== 文件统计 ==="
-          echo "latest.csv:     $(wc -l < latest.csv) 行"
-          echo "history.csv:    $(wc -l < history.csv) 行"
-          echo "archive 文件数: $(ls $ARCHIVE_DIR/*.csv 2>/dev/null | wc -l)"
+          echo "latest: $(wc -l < latest.csv) 行"
+          echo "history: $(wc -l < history.csv) 行"
 
       - name: Commit & Push
         run: |
@@ -96,13 +64,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           git add latest.csv history.csv archive/
+          git diff --cached --quiet && exit 0
 
-          # 检查是否有变更
-          if git diff --cached --quiet; then
-            echo "没有变更，跳过提交"
-          else
-            TODAY=$(date +%Y-%m-%d)
-            git commit -m "cfst: speedtest $TODAY"
-            git push
-            echo "✅ 已推送到仓库"
-          fi
+          git commit -m "cfst: $(date +%Y-%m-%d)"
+          git push

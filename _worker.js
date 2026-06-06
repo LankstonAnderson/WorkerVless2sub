@@ -1605,6 +1605,42 @@ export default {
 				console.log("notlsresponseBody: " + notlsresponseBody);
 			}
 
+			// 历史节点功能：将当前快照保存到 KV 并追加历史节点
+			if (env.ENABLE_HISTORY === 'true' && env.SUB_HISTORY) {
+				try {
+					const historyDays = Number(env.HISTORY_DAYS) || 7;
+					const kv = env.SUB_HISTORY;
+					const now = new Date();
+					const todayKey = `history:${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+					const ttlSecond = historyDays * 24 * 60 * 60;
+
+					// 保存当前节点快照到 KV（使用 TTL 自动过期）
+					kv.put(todayKey, combinedContent, { expirationTtl: ttlSecond }).catch(e => console.error('保存历史快照失败:', e));
+
+					// 读取过去 historyDays-1 天的历史快照
+					const 历史键列表 = [];
+					for (let i = 1; i < historyDays; i++) {
+						const d = new Date(now);
+						d.setDate(d.getDate() - i);
+						历史键列表.push(`history:${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+					}
+
+					const 历史值列表 = await Promise.all(历史键列表.map(k => kv.get(k)));
+					const 当前行集合 = new Set(combinedContent.split('\n'));
+					for (const 历史内容 of 历史值列表) {
+						if (!历史内容) continue;
+						for (const 行 of 历史内容.split('\n')) {
+							if (行 && !当前行集合.has(行)) {
+								combinedContent += '\n' + 行;
+								当前行集合.add(行);
+							}
+						}
+					}
+				} catch (e) {
+					console.error('历史节点处理出错:', e);
+				}
+			}
+
 			if (协议类型 == atob('VHJvamFu') && (userAgent.includes('surge') || (format === 'surge' && !isSubConverterRequest)) && !userAgent.includes('cf-workers-sub')) {
 				const 特洛伊Links = combinedContent.split('\n');
 				const 特洛伊LinksJ8 = generateFakeInfo(特洛伊Links.join('|'), uuid, host);

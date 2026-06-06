@@ -2,3 +2,18 @@ name = "vless2sub-worker"
 main = "_worker.js"
 compatibility_date = "2025-09-07"
 keep_vars = true
+
+# === KV 历史节点功能配置（可选） ===
+# 如需启用请取消注释并填写你的 KV namespace ID：
+# kv_namespaces = [
+#   { binding = "SUB_HISTORY", id = "你的KV命名空间ID" }
+# ]
+# 环境变量：
+#   ENABLE_HISTORY=true    # 开启历史节点功能（默认关闭）
+#   HISTORY_DAYS=7          # 保留天数（默认 7）
+
+# === 测速结果读取 ===
+# 如需使用 R2 私有测速结果，在 Worker 环境变量中设置：
+#   ADDCSV=你的cfster-worker URL/latest.csv
+# cfster-worker 部署说明见 cfster-worker/ 目录
+# 测速+上传脚本见 cfster-uploader.py

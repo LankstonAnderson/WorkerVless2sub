@@ -32,7 +32,7 @@ jobs:
           ./cfst -f ip.txt -o result.csv \
             -url "https://speedtest.andersonrobotics.xx.kg" \
             -tl 200 -tll 0 -tlr 0.2 \
-            -sl 1 -dn 20 -dt 10 \
+            -sl 1 -dn 200 -dt 5 \
             -p 0 -n 500
 
           TOTAL=$(tail -n +2 result.csv | wc -l)

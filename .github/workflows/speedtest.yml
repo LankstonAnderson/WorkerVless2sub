@@ -6,7 +6,7 @@ permissions:
 on:
   schedule:
     - cron: '0 2 * * *'  # 每天 UTC 02:00（北京时间 10:00）
-  workflow_dispatch:       # 手动触发
+  workflow_dispatch:
 
 env:
   CFST_VERSION: '2.3.5'
@@ -30,23 +30,33 @@ jobs:
       - name: Run SpeedTest
         run: |
           ./cfst -f ip.txt -o result.csv \
+            -url "https://speedtest.andersonrobotics.xx.kg" \
             -tl 200 -tll 0 -tlr 0.2 \
-            -dd -p 0 -n 500
+            -sl 1 -dn 20 -dt 10 \
+            -p 0 -n 500
 
-          echo "测速完成，共 $(tail -n +2 result.csv | wc -l) 个 IP"
+          TOTAL=$(tail -n +2 result.csv | wc -l)
+          echo "测速完成，共 $TOTAL 个 IP"
 
-      - name: Update Files
+      - name: Process
         run: |
           TODAY=$(date +%Y-%m-%d)
           mkdir -p archive
 
-          # 1. latest.csv → 直接用今天的结果（无表头）
-          tail -n +2 result.csv > latest.csv
+          # 过滤掉 0 MB/s 的行
+          # 表头: IP 地址,已发送,已接收,丢包率,平均延迟,下载速度(MB/s),地区码
+          # 下载速度在第 6 列（索引 5）
+          awk -F',' 'NR==1 || $6+0 > 0' result.csv > result_filtered.csv
+          FILTERED=$(tail -n +2 result_filtered.csv | wc -l)
+          echo "过滤 0MB 后: $FILTERED 个 IP（原始 $TOTAL 个）"
 
-          # 2. 保存今日到 archive（仅用于 history 合并）
-          cp result.csv "archive/$TODAY.csv"
+          # 1. latest.csv → 最新结果（无表头）
+          tail -n +2 result_filtered.csv > latest.csv
 
-          # 3. history.csv → 合并最近 7 天，去重
+          # 2. 保存今日到 archive
+          cp result_filtered.csv "archive/$TODAY.csv"
+
+          # 3. history.csv → 合并最近 7 天，按 IP 去重
           echo "IP地址,已发送,已接收,丢包率,平均延迟,下载速度(MB/s),地区码" > history.csv
           ls -r archive/*.csv | head -$HISTORY_DAYS | while read f; do
             tail -n +2 "$f"

@@ -47,8 +47,8 @@ jobs:
           awk -F',' 'NR==1 || $6+0 > 0' result.csv | tail -n +2 > latest.csv
           echo "latest: $(wc -l < latest.csv) 个有速度 IP"
 
-          # archive → 保存完整结果（含 0MB，用于 history 合并）
-          cp result.csv "archive/$TODAY.csv"
+          # archive → 保存有速度的结果（已过滤 0MB）
+          cp latest.csv "archive/$TODAY.csv"
 
           # history.csv → 合并 7 天，按 IP 去重，最多 HISTORY_MAX 个
           echo "IP地址,已发送,已接收,丢包率,平均延迟,下载速度(MB/s),地区码" > history.csv

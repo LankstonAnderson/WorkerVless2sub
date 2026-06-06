@@ -11,6 +11,7 @@ on:
 env:
   CFST_VERSION: '2.3.5'
   HISTORY_DAYS: 7
+  HISTORY_MAX: 200
 
 jobs:
   speedtest:
@@ -60,7 +61,7 @@ jobs:
           echo "IP地址,已发送,已接收,丢包率,平均延迟,下载速度(MB/s),地区码" > history.csv
           ls -r archive/*.csv | head -$HISTORY_DAYS | while read f; do
             tail -n +2 "$f"
-          done | awk -F',' '!seen[$1]++' >> history.csv
+          done | awk -F',' '!seen[$1]++' | head -$HISTORY_MAX >> history.csv
 
           # 4. 清理过期 archive
           find archive -name "*.csv" -mtime +$HISTORY_DAYS -delete

@@ -7,6 +7,7 @@ CloudflareSpeedTest 测速 + 上传脚本
 
 import os
 import sys
+import glob
 import subprocess
 import datetime
 import zoneinfo
@@ -94,14 +95,13 @@ def upload_to_github():
     branch_name = f"speedtest/{today}"
 
     # 1. 创建分支
-    print(f"   1/4 创建分支 {branch_name}...", end=" ")
+    print(f"   1/5 创建分支 {branch_name}...", end=" ")
     run(f"gh api repos/{GITHUB_REPO}/git/refs/heads/main")
     run(f"git checkout -B {branch_name}", check=False)
     print("✅")
 
     # 2. 复制结果文件
     print(f"   2/4 复制结果文件...", end=" ")
-    # 提取有速度的 IP（过滤 0MB）
     with open(RESULT_CSV, 'r') as f:
         lines = f.readlines()
         header = lines[0]
@@ -111,15 +111,50 @@ def upload_to_github():
         f.writelines(filtered)
     print(f"✅ ({len(filtered)-1} 个有速度 IP)")
 
-    # 3. 提交并推送
-    print(f"   3/4 提交并推送...", end=" ")
-    run(f"git add {GITHUB_FILE_PATH}")
+    # 3. 生成 latest.csv、归档、history.csv
+    print(f"   3/4 生成 history.csv...", end=" ")
+    os.makedirs("archive", exist_ok=True)
+
+    # latest.csv（无表头，仅 speed>0）
+    with open("latest.csv", 'w') as f:
+        for row in filtered[1:]:
+            f.write(row)
+
+    # 归档
+    with open(f"archive/{today}.csv", 'w') as f:
+        for row in filtered[1:]:
+            f.write(row)
+
+    # history.csv：合并 7 天，去重，最多 HISTORY_MAX 个
+    archive_files = sorted(glob.glob("archive/*.csv"), reverse=True)[:7]
+    seen = set()
+    history_rows = []
+    for af in archive_files:
+        with open(af) as f:
+            for line in f:
+                cols = line.strip().split(',')
+                if len(cols) < 7: continue
+                speed = float(cols[5])
+                region = cols[6]
+                if speed > 0 and region != "N/A" and cols[0] not in seen:
+                    seen.add(cols[0])
+                    history_rows.append(line)
+                    if len(history_rows) >= 200: break
+        if len(history_rows) >= 200: break
+
+    with open("history.csv", 'w') as f:
+        f.writelines(history_rows)
+    print(f"✅ ({len(history_rows)} 个 IP)")
+
+    # 4. 提交并推送
+    print(f"   4/4 提交并推送...", end=" ")
+    run(f"git add {GITHUB_FILE_PATH} latest.csv history.csv archive/")
     run(f'git commit -m "cfst: {today}"', check=False)
     run(f"git push -u fork {branch_name} --force", check=False)
     print("✅")
 
-    # 4. 创建 PR
-    print(f"   4/4 创建 PR...", end=" ")
+    # 5. 创建 PR
+    print(f"   5/5 创建 PR...", end=" ")
     result = run(f'gh pr create --repo {GITHUB_REPO} --head {FORK_OWNER}:{branch_name} --base main '
                  f'--title "cfst: {today}" --body "自动测速结果"', check=False)
     if result and "already exists" in result:

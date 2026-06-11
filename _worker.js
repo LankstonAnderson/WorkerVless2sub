@@ -343,7 +343,10 @@ async function 整理测速结果(tls) {
 			const portIndex = findColumn(normalizedHeader, ['端口', 'port']);
 			const tlsIndex = findColumn(normalizedHeader, ['tls', 'istls', '是否tls']);
 			const speedIndex = findColumn(normalizedHeader, ['下载速度', '速度', 'speed', 'downloadspeed', 'download']);
-			const remarkColumnIndex = findRemarkColumn(normalizedHeader);
+			let remarkColumnIndex = findRemarkColumn(normalizedHeader);
+			if (remarkColumnIndex === -1 && header.length > 0) {
+				remarkColumnIndex = header.length - 1;
+			}
 
 			if (ipIndex === -1) {
 				ipIndex = 0;

@@ -43,20 +43,23 @@ jobs:
 EOF
             echo "使用默认 Cloudflare IP 段"
           fi
+          # 限制测速 IP 数量
+          head -50 ip.txt > ip.limited.txt && mv ip.limited.txt ip.txt
+          echo "取前 50 个 IP 进行测速"
 
       - name: Run SpeedTest
         run: |
           ./cfst -f ip.txt -o result.csv \
             -url "https://speedtest.andersonrobotics.xx.kg" \
             -tl 200 -tll 0 -tlr 0.2 \
-            -sl 1 -dn 20 -dt 5 \
-            -p 0 -n 10
+            -sl 1 -dn 10 -dt 5 \
+            -p 0 -n 500
 
           echo "测速完成，共 $(tail -n +2 result.csv | wc -l) 个 IP"
 
       - name: Process
         run: |
-          TODAY=$(date +%Y-%m-%d)
+          TODAY=$(TZ='Asia/Shanghai' date +%Y-%m-%d)
           mkdir -p archive
 
           # latest.csv → 有速度的 IP（高质量）
@@ -69,7 +72,7 @@ EOF
           # history.csv → 合并 7 天，按 IP 去重，最多 HISTORY_MAX 个
           echo "IP地址,已发送,已接收,丢包率,平均延迟,下载速度(MB/s),地区码" > history.csv
           ls -r archive/*.csv | head -$HISTORY_DAYS | while read f; do
-            tail -n +2 "$f"
+            cat "$f"
           done | awk -F',' '!seen[$1]++' | head -$HISTORY_MAX >> history.csv
 
           # 清理过期 archive

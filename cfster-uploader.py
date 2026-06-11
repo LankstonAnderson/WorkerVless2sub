@@ -9,19 +9,22 @@ import os
 import sys
 import subprocess
 import datetime
+import zoneinfo
 
 # ==================== 配置区 ====================
 
 # --- GitHub ---
 GITHUB_REPO = "LankstonAnderson/WorkerVless2sub"  # 目标仓库
+FORK_OWNER = "Chappie743"  # 你的 fork 用户名
 GITHUB_FILE_PATH = "result.csv"  # 仓库中的文件路径
 
 # --- CFST ---
 CFST_BIN = "/home/Chappie/cfst/cfst"
 CFST_IP_FILE = "/home/Chappie/cfst/ip.txt"
+CFST_IP_LIMIT = 50  # 最多测前 N 个 IP
 CFST_ARGS = ["-tl", "200", "-tll", "0", "-tlr", "0.2",
-             "-sl", "1", "-dn", "20", "-dt", "5",
-             "-p", "0", "-n", "10"]
+             "-sl", "1", "-dn", "10", "-dt", "5",
+             "-p", "0", "-n", "500"]
 RESULT_CSV = "/home/Chappie/cfst/result.csv"
 
 # ==================== 工具函数 ====================
@@ -54,7 +57,15 @@ def run_speedtest():
     print(f"   参数: {' '.join(CFST_ARGS)}")
     print()
 
-    cmd = f"{CFST_BIN} -f {CFST_IP_FILE} -o {RESULT_CSV} {' '.join(CFST_ARGS)}"
+    # 限制 IP 数量
+    with open(CFST_IP_FILE) as f:
+        ips = [line.strip() for line in f if line.strip()]
+    print(f"   原始 IP 池: {len(ips)} 个，取前 {CFST_IP_LIMIT} 个")
+    limited_ip_file = CFST_IP_FILE + ".limited"
+    with open(limited_ip_file, 'w') as f:
+        f.write('\n'.join(ips[:CFST_IP_LIMIT]))
+
+    cmd = f"{CFST_BIN} -f {limited_ip_file} -o {RESULT_CSV} {' '.join(CFST_ARGS)}"
     result = subprocess.run(cmd, shell=True, cwd=os.path.dirname(CFST_BIN))
 
     if result.returncode != 0:
@@ -78,12 +89,13 @@ def upload_to_github():
     """通过 gh CLI 提交 PR"""
     print("\n📦 提交到 GitHub...")
 
-    today = datetime.date.today().isoformat()
+    tz = zoneinfo.ZoneInfo("Asia/Shanghai")
+    today = datetime.datetime.now(tz).strftime("%Y-%m-%d")
     branch_name = f"speedtest/{today}"
 
     # 1. 创建分支
     print(f"   1/4 创建分支 {branch_name}...", end=" ")
-    run(f"gh api repos/{GITHUB_REPO}/git/refs/heads/{GITHUB_REPO.split('/')[1]}")
+    run(f"gh api repos/{GITHUB_REPO}/git/refs/heads/main")
     run(f"git checkout -B {branch_name}", check=False)
     print("✅")
 
@@ -108,7 +120,7 @@ def upload_to_github():
 
     # 4. 创建 PR
     print(f"   4/4 创建 PR...", end=" ")
-    result = run(f'gh pr create --repo {GITHUB_REPO} --head {branch_name} --base main '
+    result = run(f'gh pr create --repo {GITHUB_REPO} --head {FORK_OWNER}:{branch_name} --base main '
                  f'--title "cfst: {today}" --body "自动测速结果"', check=False)
     if result and "already exists" in result:
         print("⚠️ PR 已存在")

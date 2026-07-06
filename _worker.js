@@ -313,7 +313,7 @@ async function 整理测速结果(tls) {
 			return row[remarkColumnIndex].trim();
 		}
 
-		return '未知';
+		return '';
 	}
 
 	function isLikelyAddress(value) {
@@ -343,10 +343,7 @@ async function 整理测速结果(tls) {
 			const portIndex = findColumn(normalizedHeader, ['端口', 'port']);
 			const tlsIndex = findColumn(normalizedHeader, ['tls', 'istls', '是否tls']);
 			const speedIndex = findColumn(normalizedHeader, ['下载速度', '速度', 'speed', 'downloadspeed', 'download']);
-			let remarkColumnIndex = hasHeader ? findRemarkColumn(normalizedHeader) : (rows[0].length - 1);
-			if (remarkColumnIndex === -1 && header.length > 0) {
-				remarkColumnIndex = header.length - 1;
-			}
+			const remarkColumnIndex = findRemarkColumn(normalizedHeader);
 
 			if (ipIndex === -1) {
 				ipIndex = 0;
@@ -1075,10 +1072,10 @@ async function subHtml(request) {
 								
 								const host = vmessJson.host;
 								const uuid = vmessJson.id;
-								const isGrpc = vmessJson.net === 'grpc';
-								const path = isGrpc ? '' : (vmessJson.path || '/');
+								const 是gRPC = vmessJson.net === 'grpc';
+								const path = 是gRPC ? '' : (vmessJson.path || '/');
 								const sni = vmessJson.sni || host;
-								const type = isGrpc ? 'grpc' : (vmessJson.type || 'none');
+								const type = 是gRPC ? 'grpc' : (vmessJson.type || 'none');
 								const alpn = vmessJson.alpn || '';
 								const alterId = vmessJson.aid || 0;
 								const security = vmessJson.scy || 'auto';
@@ -1087,8 +1084,8 @@ async function subHtml(request) {
 								subLink = \`https://\${domain}/sub?host=\${host}&uuid=\${uuid}&path=\${encodeURIComponent(path)}&sni=\${sni}&type=\${type}&alpn=\${encodeURIComponent(alpn)}&alterid=\${alterId}&security=\${security}\`;
 							} else {
 								const uuid = link.split("//")[1].split("@")[0];
-								const hostWithPort = link.split("@")[1].split("?")[0];
-								const host = hostWithPort.split(":")[0];
+								const 主机和端口 = link.split("@")[1].split("?")[0];
+								const host = 主机和端口.split(":")[0];
 								const search = link.split("?")[1].split("#")[0];
 								const domain = window.location.hostname;
 								
@@ -1249,7 +1246,7 @@ export default {
 				}
 			}
 
-			path = env.PATH || (type === 'grpc' ? '' : "/?ed=2560");
+			path = env.PATH || "/?ed=2560";
 			sni = env.SNI || host;
 			type = env.TYPE || type;
 			隧道版本作者 = env.ED || 隧道版本作者;
@@ -1265,19 +1262,19 @@ export default {
 
 			await sendMessage(`#获取订阅 ${FileName}`, request.headers.get('CF-Connecting-IP'), `UA: ${userAgentHeader}</tg-spoiler>\n域名: ${url.hostname}\n<tg-spoiler>入口: ${url.pathname + url.search}</tg-spoiler>`);
 		} else {
-			const rawUrl = url.href;
-			const directLinkMatch = rawUrl.match(/\/(sub\?)?(vless|trojan):\/\/([^@]+)@([^:?&\/#]+)(?::(\d+))?/i);
-			if (directLinkMatch) {
-				const [, , protocol, cred, addr, port] = directLinkMatch;
-				if (protocol.toLowerCase() === 'vless') {
-					uuid = cred;
+			const 原始URL = url.href;
+			const 直接链接匹配 = 原始URL.match(/\/(sub\?)?(vless|trojan):\/\/([^@]+)@([^:?&\/#]+)(?::(\d+))?/i);
+			if (直接链接匹配) {
+				const [, , 协议, 凭证, 地址, 端口] = 直接链接匹配;
+				if (协议.toLowerCase() === 'vless') {
+					uuid = 凭证;
 				} else {
-					uuid = url.searchParams.get('password') || url.searchParams.get('pw') || cred;
+					uuid = url.searchParams.get('password') || url.searchParams.get('pw') || 凭证;
 				}
-				host = addr;
+				host = 地址;
 				path = url.searchParams.get('path') || '';
-				if (port && !url.searchParams.has('port')) {
-					url.searchParams.set('port', port);
+				if (端口 && !url.searchParams.has('port')) {
+					url.searchParams.set('port', 端口);
 				}
 			} else {
 				host = url.searchParams.get('host');
@@ -1286,13 +1283,13 @@ export default {
 			}
 			sni = url.searchParams.get('sni') || host;
 			type = url.searchParams.get('type') || type;
-			const grpcAuthority = url.searchParams.get('authority');
-			const grpcServiceName = url.searchParams.get('serviceName');
-			const grpcMode = url.searchParams.get('mode');
+			const gRPC权威 = url.searchParams.get('authority');
+			const gRPC服务名 = url.searchParams.get('serviceName');
+			const gRPC模式 = url.searchParams.get('mode');
 			if (type === 'grpc') {
-				host = grpcAuthority || host;
-				sni = grpcAuthority || sni;
-				path = grpcServiceName || '';
+				host = gRPC权威 || host;
+				sni = gRPC权威 || sni;
+				path = gRPC服务名 || '';
 			}
 			scv = url.searchParams.get('allowInsecure') == '1' ? 'true' : (url.searchParams.get('scv') || scv);
 			const mode = url.searchParams.get('mode') || null;
@@ -1353,8 +1350,8 @@ export default {
 			}
 
 			if (!path || path.trim() === '') {
-				path = type === 'grpc' ? '' : '/?ed=2560';
-			} else if (type !== 'grpc') {
+				path = '/?ed=2560';
+			} else {
 				// 如果第一个字符不是斜杠，则在前面添加一个斜杠
 				path = (path[0] === '/') ? path : '/' + path;
 			}
@@ -1510,16 +1507,16 @@ export default {
 					}
 
 					if (协议类型 == 'VMess') {
-						const net = type === 'grpc' ? 'grpc' : 'ws';
-						const headerType = type === 'grpc' ? 'gun' : type;
-						const grpcPath = type === 'grpc' ? '' : path;
-						const vmessLink = `vmess://${utf8ToBase64(`{"v":"2","ps":"${addressid + EndPS}","add":"${address}","port":"${port}","id":"${uuid}","aid":"${额外ID}","scy":"${加密方式}","net":"${net}","type":"${headerType}","host":"${host}","path":"${grpcPath}","tls":"","sni":"","alpn":"${encodeURIComponent(alpn)}","fp":""}`)}`;
+						const 网络 = type === 'grpc' ? 'grpc' : 'ws';
+						const 头部类型 = type === 'grpc' ? 'gun' : type;
+						const gRPC路径 = type === 'grpc' ? '' : path;
+						const vmessLink = `vmess://${utf8ToBase64(`{"v":"2","ps":"${addressid + EndPS}","add":"${address}","port":"${port}","id":"${uuid}","aid":"${额外ID}","scy":"${加密方式}","net":"${网络}","type":"${头部类型}","host":"${host}","path":"${gRPC路径}","tls":"","sni":"","alpn":"${encodeURIComponent(alpn)}","fp":""}`)}`;
 						return vmessLink;
 					} else {
-						const authorityParam = type === 'grpc' ? `&authority=${encodeURIComponent(host)}` : '';
-						const serviceNameParam = type === 'grpc' && path ? `&serviceName=${encodeURIComponent(path)}` : '';
-						const grpcSkip = type === 'grpc' ? '' : `&path=${encodeURIComponent(path)}`;
-						const 为烈士Link = `${atob(atob('ZG14bGMzTTZMeTg9')) + uuid}@${address}:${port}?security=&type=${type}&host=${host}${authorityParam}${serviceNameParam}${grpcSkip}&encryption=none#${encodeURIComponent(addressid + EndPS)}`;
+						const 权威参数 = type === 'grpc' ? `&authority=${encodeURIComponent(host)}` : '';
+						const 服务名参数 = type === 'grpc' && path ? `&serviceName=${encodeURIComponent(path)}` : '';
+						const gRPC跳过 = type === 'grpc' ? '' : `&path=${encodeURIComponent(path)}`;
+						const 为烈士Link = `${atob(atob('ZG14bGMzTTZMeTg9')) + uuid}@${address}:${port}?security=&type=${type}&host=${host}${权威参数}${服务名参数}${gRPC跳过}&encryption=none#${encodeURIComponent(addressid + EndPS)}`;
 						return 为烈士Link;
 					}
 
@@ -1615,22 +1612,22 @@ export default {
 				}
 
 				if (协议类型 == 'VMess') {
-					const net = type === 'grpc' ? 'grpc' : 'ws';
-					const headerType = type === 'grpc' ? 'gun' : type;
-					const grpcPath = type === 'grpc' ? '' : 最终路径;
-					const vmessLink = `vmess://${utf8ToBase64(`{"v":"2","ps":"${addressid + 节点备注}","add":"${address}","port":"${port}","id":"${uuid}","aid":"${额外ID}","scy":"${加密方式}","net":"${net}","type":"${headerType}","host":"${伪装域名}","path":"${grpcPath}","tls":"tls","sni":"${sni}","alpn":"${encodeURIComponent(alpn)}","fp":"","allowInsecure":"${scv == 'true' ? '1' : '0'}","fragment":"1,40-60,30-50,tlshello"}`)}`;
+					const 网络 = type === 'grpc' ? 'grpc' : 'ws';
+					const 头部类型 = type === 'grpc' ? 'gun' : type;
+					const gRPC路径 = type === 'grpc' ? '' : 最终路径;
+					const vmessLink = `vmess://${utf8ToBase64(`{"v":"2","ps":"${addressid + 节点备注}","add":"${address}","port":"${port}","id":"${uuid}","aid":"${额外ID}","scy":"${加密方式}","net":"${网络}","type":"${头部类型}","host":"${伪装域名}","path":"${gRPC路径}","tls":"tls","sni":"${sni}","alpn":"${encodeURIComponent(alpn)}","fp":"","allowInsecure":"${scv == 'true' ? '1' : '0'}","fragment":"1,40-60,30-50,tlshello"}`)}`;
 					return vmessLink;
 				} else if (协议类型 == atob('VHJvamFu')) {
-					const authorityParam = type === 'grpc' ? `&authority=${encodeURIComponent(伪装域名)}` : '';
-					const serviceNameParam = type === 'grpc' && 最终路径 ? `&serviceName=${encodeURIComponent(最终路径)}` : '';
-					const grpcSkip = type === 'grpc' ? '' : `&path=${encodeURIComponent(最终路径)}`;
-					const 特洛伊Link = `${atob(atob('ZEhKdmFtRnVPaTh2')) + uuid}@${address}:${port}?security=tls&sni=${sni}&alpn=${encodeURIComponent(alpn)}&fp=random&type=${type}&host=${伪装域名}${authorityParam}${serviceNameParam}${grpcSkip}${scv == 'true' ? '&allowInsecure=1' : ''}&fragment=${encodeURIComponent('1,40-60,30-50,tlshello')}#${encodeURIComponent(addressid + 节点备注)}`;
+					const 权威参数 = type === 'grpc' ? `&authority=${encodeURIComponent(伪装域名)}` : '';
+					const 服务名参数 = type === 'grpc' && 最终路径 ? `&serviceName=${encodeURIComponent(最终路径)}` : '';
+					const gRPC跳过 = type === 'grpc' ? '' : `&path=${encodeURIComponent(最终路径)}`;
+					const 特洛伊Link = `${atob(atob('ZEhKdmFtRnVPaTh2')) + uuid}@${address}:${port}?security=tls&sni=${sni}&alpn=${encodeURIComponent(alpn)}&fp=random&type=${type}&host=${伪装域名}${权威参数}${服务名参数}${gRPC跳过}${scv == 'true' ? '&allowInsecure=1' : ''}&fragment=${encodeURIComponent('1,40-60,30-50,tlshello')}#${encodeURIComponent(addressid + 节点备注)}`;
 					return 特洛伊Link;
 				} else {
-					const authorityParam = type === 'grpc' ? `&authority=${encodeURIComponent(伪装域名)}` : '';
-					const serviceNameParam = type === 'grpc' && 最终路径 ? `&serviceName=${encodeURIComponent(最终路径)}` : '';
-					const grpcSkip = type === 'grpc' ? '' : `&path=${encodeURIComponent(最终路径) + xhttp}`;
-					const 为烈士Link = `${atob(atob('ZG14bGMzTTZMeTg9')) + uuid}@${address}:${port}?security=tls&sni=${sni}&alpn=${encodeURIComponent(alpn)}&fp=random&type=${type}&host=${伪装域名}${authorityParam}${serviceNameParam}${grpcSkip}${scv == 'true' ? '&allowInsecure=1' : ''}&fragment=${encodeURIComponent('1,40-60,30-50,tlshello')}&encryption=none#${encodeURIComponent(addressid + 节点备注)}`;
+					const 权威参数 = type === 'grpc' ? `&authority=${encodeURIComponent(伪装域名)}` : '';
+					const 服务名参数 = type === 'grpc' && 最终路径 ? `&serviceName=${encodeURIComponent(最终路径)}` : '';
+					const gRPC跳过 = type === 'grpc' ? '' : `&path=${encodeURIComponent(最终路径) + xhttp}`;
+					const 为烈士Link = `${atob(atob('ZG14bGMzTTZMeTg9')) + uuid}@${address}:${port}?security=tls&sni=${sni}&alpn=${encodeURIComponent(alpn)}&fp=random&type=${type}&host=${伪装域名}${权威参数}${服务名参数}${gRPC跳过}${scv == 'true' ? '&allowInsecure=1' : ''}&fragment=${encodeURIComponent('1,40-60,30-50,tlshello')}&encryption=none#${encodeURIComponent(addressid + 节点备注)}`;
 					return 为烈士Link;
 				}
 

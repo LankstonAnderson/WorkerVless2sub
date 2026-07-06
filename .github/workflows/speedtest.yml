@@ -28,12 +28,21 @@ jobs:
           tar -zxf cfst_linux_amd64.tar.gz
           chmod +x cfst
 
+      - name: 合并历史 IP
+        run: |
+          if [ -f history.csv ]; then
+            awk -F',' '{print $1}' history.csv | tail -n 100 >> ip.txt
+            echo "已合并 $(tail -n 100 history.csv | wc -l) 个历史 IP 到 ip.txt"
+          else
+            echo "history.csv 不存在，跳过历史 IP 合并"
+          fi
+
       - name: Run SpeedTest
         run: |
-          ./cfst -f ip.txt -o result.csv \
-            -url "https://speedtest.andersonrobotics.xx.kg" \
-            -tl 200 -tll 0 -tlr 0.2 \
-            -sl 1 -dn 10 -dt 5 \
+          ./cfst -f ip.txt -o result.csv \\
+            -url "https://speedtest.andersonrobotics.xx.kg" \\
+            -tl 200 -tll 0 -tlr 0.2 \\
+            -sl 1 -dn 10 -dt 5 \\
             -p 0 -n 500
 
           echo "测速完成，共 $(tail -n +2 result.csv | wc -l) 个 IP"
@@ -61,6 +70,9 @@ jobs:
           find archive -name "*.csv" -mtime +$HISTORY_DAYS -delete
 
           echo "history: $(wc -l < history.csv) 个 IP（去重后，上限 $HISTORY_MAX）"
+
+      - name: Check JS syntax
+        run: node --check _worker.js
 
       - name: Commit & Push
         run: |

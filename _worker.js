@@ -1075,9 +1075,10 @@ async function subHtml(request) {
 								
 								const host = vmessJson.host;
 								const uuid = vmessJson.id;
-								const path = vmessJson.path || '/';
+								const isGrpc = vmessJson.net === 'grpc';
+								const path = isGrpc ? '' : (vmessJson.path || '/');
 								const sni = vmessJson.sni || host;
-								const type = vmessJson.type || 'none';
+								const type = isGrpc ? 'grpc' : (vmessJson.type || 'none');
 								const alpn = vmessJson.alpn || '';
 								const alterId = vmessJson.aid || 0;
 								const security = vmessJson.scy || 'auto';
@@ -1086,10 +1087,12 @@ async function subHtml(request) {
 								subLink = \`https://\${domain}/sub?host=\${host}&uuid=\${uuid}&path=\${encodeURIComponent(path)}&sni=\${sni}&type=\${type}&alpn=\${encodeURIComponent(alpn)}&alterid=\${alterId}&security=\${security}\`;
 							} else {
 								const uuid = link.split("//")[1].split("@")[0];
+								const hostWithPort = link.split("@")[1].split("?")[0];
+								const host = hostWithPort.split(":")[0];
 								const search = link.split("?")[1].split("#")[0];
 								const domain = window.location.hostname;
 								
-								subLink = \`https://\${domain}/sub?\${uuidType}=\${uuid}&\${search}\`;
+								subLink = \`https://\${domain}/sub?host=\${host}&\${uuidType}=\${uuid}&\${search}\`;
 							}
 							document.getElementById('result').value = subLink;
 	
@@ -1246,7 +1249,7 @@ export default {
 				}
 			}
 
-			path = env.PATH || "/?ed=2560";
+			path = env.PATH || (type === 'grpc' ? '' : "/?ed=2560");
 			sni = env.SNI || host;
 			type = env.TYPE || type;
 			隧道版本作者 = env.ED || 隧道版本作者;
@@ -1262,9 +1265,25 @@ export default {
 
 			await sendMessage(`#获取订阅 ${FileName}`, request.headers.get('CF-Connecting-IP'), `UA: ${userAgentHeader}</tg-spoiler>\n域名: ${url.hostname}\n<tg-spoiler>入口: ${url.pathname + url.search}</tg-spoiler>`);
 		} else {
-			host = url.searchParams.get('host');
-			uuid = url.searchParams.get('uuid') || url.searchParams.get('password') || url.searchParams.get('pw');
-			path = url.searchParams.get('path');
+			const rawUrl = url.href;
+			const directLinkMatch = rawUrl.match(/\/(sub\?)?(vless|trojan):\/\/([^@]+)@([^:?&\/#]+)(?::(\d+))?/i);
+			if (directLinkMatch) {
+				const [, , protocol, cred, addr, port] = directLinkMatch;
+				if (protocol.toLowerCase() === 'vless') {
+					uuid = cred;
+				} else {
+					uuid = url.searchParams.get('password') || url.searchParams.get('pw') || cred;
+				}
+				host = addr;
+				path = url.searchParams.get('path') || '';
+				if (port && !url.searchParams.has('port')) {
+					url.searchParams.set('port', port);
+				}
+			} else {
+				host = url.searchParams.get('host');
+				uuid = url.searchParams.get('uuid') || url.searchParams.get('password') || url.searchParams.get('pw');
+				path = url.searchParams.get('path');
+			}
 			sni = url.searchParams.get('sni') || host;
 			type = url.searchParams.get('type') || type;
 			scv = url.searchParams.get('allowInsecure') == '1' ? 'true' : (url.searchParams.get('scv') || scv);
@@ -1326,8 +1345,8 @@ export default {
 			}
 
 			if (!path || path.trim() === '') {
-				path = '/?ed=2560';
-			} else {
+				path = type === 'grpc' ? '' : '/?ed=2560';
+			} else if (type !== 'grpc') {
 				// 如果第一个字符不是斜杠，则在前面添加一个斜杠
 				path = (path[0] === '/') ? path : '/' + path;
 			}
@@ -1483,10 +1502,14 @@ export default {
 					}
 
 					if (协议类型 == 'VMess') {
-						const vmessLink = `vmess://${utf8ToBase64(`{"v":"2","ps":"${addressid + EndPS}","add":"${address}","port":"${port}","id":"${uuid}","aid":"${额外ID}","scy":"${加密方式}","net":"ws","type":"${type}","host":"${host}","path":"${path}","tls":"","sni":"","alpn":"${encodeURIComponent(alpn)}","fp":""}`)}`;
+						const net = type === 'grpc' ? 'grpc' : 'ws';
+						const headerType = type === 'grpc' ? 'gun' : type;
+						const grpcPath = type === 'grpc' ? '' : path;
+						const vmessLink = `vmess://${utf8ToBase64(`{"v":"2","ps":"${addressid + EndPS}","add":"${address}","port":"${port}","id":"${uuid}","aid":"${额外ID}","scy":"${加密方式}","net":"${net}","type":"${headerType}","host":"${host}","path":"${grpcPath}","tls":"","sni":"","alpn":"${encodeURIComponent(alpn)}","fp":""}`)}`;
 						return vmessLink;
 					} else {
-						const 为烈士Link = `${atob(atob('ZG14bGMzTTZMeTg9')) + uuid}@${address}:${port}?security=&type=${type}&host=${host}&path=${encodeURIComponent(path)}&encryption=none#${encodeURIComponent(addressid + EndPS)}`;
+						const grpcSkip = type === 'grpc' ? '' : `&path=${encodeURIComponent(path)}`;
+						const 为烈士Link = `${atob(atob('ZG14bGMzTTZMeTg9')) + uuid}@${address}:${port}?security=&type=${type}&host=${host}${grpcSkip}&encryption=none#${encodeURIComponent(addressid + EndPS)}`;
 						return 为烈士Link;
 					}
 
@@ -1574,7 +1597,7 @@ export default {
 				let 伪装域名 = host;
 				let 最终路径 = path;
 				let 节点备注 = EndPS;
-				if (临时中转域名.length > 0 && (host.includes('.workers.dev'))) {
+				if (type !== 'grpc' && 临时中转域名.length > 0 && (host.includes('.workers.dev'))) {
 					最终路径 = `/${host}${path}`;
 					伪装域名 = 临时中转域名[Math.floor(Math.random() * 临时中转域名.length)];
 					节点备注 = EndPS + atob('IOW3suWQr+eUqOS4tOaXtuWfn+WQjeS4rei9rOacjeWKoe+8jOivt+WwveW/q+e7keWumuiHquWumuS5ieWfn++8gQ==');
@@ -1582,13 +1605,18 @@ export default {
 				}
 
 				if (协议类型 == 'VMess') {
-					const vmessLink = `vmess://${utf8ToBase64(`{"v":"2","ps":"${addressid + 节点备注}","add":"${address}","port":"${port}","id":"${uuid}","aid":"${额外ID}","scy":"${加密方式}","net":"ws","type":"${type}","host":"${伪装域名}","path":"${最终路径}","tls":"tls","sni":"${sni}","alpn":"${encodeURIComponent(alpn)}","fp":"","allowInsecure":"${scv == 'true' ? '1' : '0'}","fragment":"1,40-60,30-50,tlshello"}`)}`;
+					const net = type === 'grpc' ? 'grpc' : 'ws';
+					const headerType = type === 'grpc' ? 'gun' : type;
+					const grpcPath = type === 'grpc' ? '' : 最终路径;
+					const vmessLink = `vmess://${utf8ToBase64(`{"v":"2","ps":"${addressid + 节点备注}","add":"${address}","port":"${port}","id":"${uuid}","aid":"${额外ID}","scy":"${加密方式}","net":"${net}","type":"${headerType}","host":"${伪装域名}","path":"${grpcPath}","tls":"tls","sni":"${sni}","alpn":"${encodeURIComponent(alpn)}","fp":"","allowInsecure":"${scv == 'true' ? '1' : '0'}","fragment":"1,40-60,30-50,tlshello"}`)}`;
 					return vmessLink;
 				} else if (协议类型 == atob('VHJvamFu')) {
-					const 特洛伊Link = `${atob(atob('ZEhKdmFtRnVPaTh2')) + uuid}@${address}:${port}?security=tls&sni=${sni}&alpn=${encodeURIComponent(alpn)}&fp=random&type=${type}&host=${伪装域名}&path=${encodeURIComponent(最终路径) + (scv == 'true' ? '&allowInsecure=1' : '')}&fragment=${encodeURIComponent('1,40-60,30-50,tlshello')}#${encodeURIComponent(addressid + 节点备注)}`;
+					const grpcSkip = type === 'grpc' ? '' : `&path=${encodeURIComponent(最终路径)}`;
+					const 特洛伊Link = `${atob(atob('ZEhKdmFtRnVPaTh2')) + uuid}@${address}:${port}?security=tls&sni=${sni}&alpn=${encodeURIComponent(alpn)}&fp=random&type=${type}&host=${伪装域名}${grpcSkip}${scv == 'true' ? '&allowInsecure=1' : ''}&fragment=${encodeURIComponent('1,40-60,30-50,tlshello')}#${encodeURIComponent(addressid + 节点备注)}`;
 					return 特洛伊Link;
 				} else {
-					const 为烈士Link = `${atob(atob('ZG14bGMzTTZMeTg9')) + uuid}@${address}:${port}?security=tls&sni=${sni}&alpn=${encodeURIComponent(alpn)}&fp=random&type=${type}&host=${伪装域名}&path=${encodeURIComponent(最终路径) + xhttp + (scv == 'true' ? '&allowInsecure=1' : '')}&fragment=${encodeURIComponent('1,40-60,30-50,tlshello')}&encryption=none#${encodeURIComponent(addressid + 节点备注)}`;
+					const grpcSkip = type === 'grpc' ? '' : `&path=${encodeURIComponent(最终路径) + xhttp}`;
+					const 为烈士Link = `${atob(atob('ZG14bGMzTTZMeTg9')) + uuid}@${address}:${port}?security=tls&sni=${sni}&alpn=${encodeURIComponent(alpn)}&fp=random&type=${type}&host=${伪装域名}${grpcSkip}${scv == 'true' ? '&allowInsecure=1' : ''}&fragment=${encodeURIComponent('1,40-60,30-50,tlshello')}&encryption=none#${encodeURIComponent(addressid + 节点备注)}`;
 					return 为烈士Link;
 				}
 

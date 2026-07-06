@@ -3,3 +3,5 @@ __pycache__/
 .opencode/
 node_modules/
 1
+.wrangler/
+*.map

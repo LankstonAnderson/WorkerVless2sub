@@ -266,4 +266,25 @@ SharonNetworks 为您的业务起飞保驾护航！
 - [ACL4SSR](https://github.com/ACL4SSR/ACL4SSR/tree/master/Clash/config)
 - [3Kmfi6HP](https://github.com/6Kmfi6HP/EDtunnel/blob/main/.github/workflows/obfuscator.yml)
 
+## 源码与构建产物 / Source and Build Artifact
+
+本项目采用源码/产物分离：
+
+- `_worker.src.js` 为人工维护的源码，所有功能修改请编辑此文件。
+- `_worker.js` 为 GitHub Actions 自动混淆生成的产物，直接用于 Cloudflare Workers / Pages 部署。
+- 修改 `_worker.src.js` 或 `obfuscator-config.json` 并推送到 `main` 分支后，`.github/workflows/obfuscator.yml` 会自动重新生成 `_worker.js` 并提交。
+- 上游仓库同步完成后，该工作流也会自动运行，确保 `_worker.js` 不会被上游的明文版本覆盖。
+
+**注意**：混淆仅增加源码阅读难度，不能替代加密；Cloudflare 环境变量（UUID、PASSWORD 等）仍由 Cloudflare 运行时管理。
+
+### 回滚 / Rollback
+
+如需取消混淆、恢复源码直出：
+
+```bash
+cp _worker.src.js _worker.js
+git add _worker.js
+git commit -m "rollback: disable obfuscation"
+# 然后可删除 .github/workflows/obfuscator.yml、obfuscator-config.json 以及 package.json 中的 obfuscate 脚本
+```
 

@@ -1,5 +1,11 @@
 {
+  "scripts": {
+    "obfuscate": "javascript-obfuscator _worker.src.js --config obfuscator-config.json --output _worker.js"
+  },
   "dependencies": {
     "opencode-ai": "^1.17.13"
+  },
+  "devDependencies": {
+    "javascript-obfuscator": "^5.4.3"
   }
 }
